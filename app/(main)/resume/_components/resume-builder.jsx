@@ -10,6 +10,7 @@ import {
   Loader2,
   Monitor,
   Save,
+  Sparkles,
 } from "lucide-react";
 import { toast } from "sonner";
 import MDEditor from "@uiw/react-md-editor";
@@ -17,19 +18,25 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
-import { saveResume } from "@/actions/resume";
+import { saveResume, improveWithAI } from "@/actions/resume";
 import { EntryForm } from "./entry-form";
 import useFetch from "@/hooks/use-fetch";
 import { useUser } from "@clerk/nextjs";
 import { entriesToMarkdown } from "@/app/lib/helper";
 import { resumeSchema } from "@/app/lib/schema";
-import html2pdf from "html2pdf.js/dist/html2pdf.min.js";
+import dynamic from 'next/dynamic';
+
+// Client-side only import for html2pdf
+const html2pdf = dynamic(() => import('html2pdf.js/dist/html2pdf.min.js'), { 
+  ssr: false 
+});
 
 export default function ResumeBuilder({ initialContent }) {
   const [activeTab, setActiveTab] = useState("edit");
   const [previewContent, setPreviewContent] = useState(initialContent);
   const { user } = useUser();
   const [resumeMode, setResumeMode] = useState("preview");
+  const [isImprovingSummary, setIsImprovingSummary] = useState(false);
 
   const {
     control,
@@ -37,6 +44,7 @@ export default function ResumeBuilder({ initialContent }) {
     handleSubmit,
     watch,
     formState: { errors },
+    setValue,
   } = useForm({
     resolver: zodResolver(resumeSchema),
     defaultValues: {
@@ -258,7 +266,47 @@ export default function ResumeBuilder({ initialContent }) {
 
             {/* Summary */}
             <div className="space-y-4">
-              <h3 className="text-lg font-medium">Professional Summary</h3>
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-medium">Professional Summary</h3>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  disabled={isImprovingSummary}
+                  onClick={async () => {
+                    const summary = watch("summary");
+                    if (!summary) {
+                      toast.error("Please enter a summary first");
+                      return;
+                    }
+                    try {
+                      setIsImprovingSummary(true);
+                      const improved = await improveWithAI({
+                        current: summary,
+                        type: "summary"
+                      });
+                      setValue("summary", improved);
+                      toast.success("Summary improved successfully!");
+                    } catch (error) {
+                      toast.error(error.message || "Failed to improve summary");
+                    } finally {
+                      setIsImprovingSummary(false);
+                    }
+                  }}
+                >
+                  {isImprovingSummary ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Improving...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="h-4 w-4 mr-2" />
+                      Improve with AI
+                    </>
+                  )}
+                </Button>
+              </div>
               <Controller
                 name="summary"
                 control={control}
