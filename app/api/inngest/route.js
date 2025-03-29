@@ -14,6 +14,10 @@ const handler = serve({
   client: inngest,
   functions: [generateIndustryInsights],
   signingKey: process.env.INNGEST_SIGNING_KEY,
+  // Add production URL configuration
+  serveHost: process.env.VERCEL_URL 
+    ? `https://${process.env.VERCEL_URL}`
+    : "http://localhost:3000",
 });
 
 export const POST = handler.POST;
